@@ -1,0 +1,7 @@
+pre-push:
+  parallel: true
+  commands:
+    analyze:
+      run: flutter analyze
+    format-check:
+      run: dart format --set-exit-if-changed lib test
