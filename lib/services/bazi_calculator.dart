@@ -40,10 +40,9 @@ Future<BaZiChart> calculateBaZi(BirthData data) async {
   final month = data.date.month;
   final day = data.date.day;
 
-  final adjustedYear =
-      await solarTermService.isBeforeLiChun(data.date)
-          ? data.date.year - 1
-          : data.date.year;
+  final adjustedYear = await solarTermService.isBeforeLiChun(data.date)
+      ? data.date.year - 1
+      : data.date.year;
 
   final yearIndex = (adjustedYear - 4) % 60;
   final yearGan = tianGan[yearIndex % 10];

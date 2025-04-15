@@ -1,0 +1,197 @@
+name: Main CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "LICENSE"
+      - ".gitignore"
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: "3.29.x"
+  CACHE_VERSION: v1
+  PUB_CACHE: ~/.pub-cache
+  ARTIFACT_RETENTION_DAYS: 5
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run Analyzer
+        run: flutter analyze
+
+  prepare-version:
+    name: Prepare Version
+    needs: lint
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get next version (dry-run)
+        id: get-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          RAW=$(npx semantic-release --dry-run --no-ci --config ./.releaserc.cjs 2>&1)
+          VERSION=$(echo "$RAW" \
+            | grep -m1 -oP '(?<=The next release version is )[\d]+\.[\d]+\.[\d]+' \
+          )
+          if [ -z "$VERSION" ]; then
+            echo "default initialReleaseVersion=1.0.0"
+            VERSION="1.0.0"
+          fi
+          echo "Found next version: $VERSION"
+          set -e
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.os }})
+    needs: [lint, prepare-version]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platforms: [android, linux]
+          - os: macos-latest
+            platforms: [macos]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PUB_CACHE }}
+            **/.dart_tool/
+            **/.pub/
+            pubspec.lock
+          key: ${{ runner.os }}-pub-${{ env.CACHE_VERSION }}-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-${{ env.CACHE_VERSION }}-
+
+      - name: Setup Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-dev liblzma-dev cmake ninja-build \
+            libglib2.0-dev libgtk-3-0 pkg-config
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Enable desktop platforms
+        run: |
+          flutter config --enable-linux-desktop
+          flutter config --enable-macos-desktop
+
+      - name: Build & package with version
+        run: |
+          VERSION=${{ needs.prepare-version.outputs.version }}
+          echo "Using version: $VERSION" 
+          REPO=${{ github.event.repository.name }}
+          mkdir -p release_assets
+
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            flutter build apk --release
+            flutter build appbundle
+            flutter build linux --release
+
+            cp build/app/outputs/flutter-apk/app-release.apk \
+               release_assets/${REPO}-${VERSION}.apk || true
+            cp build/app/outputs/bundle/release/app-release.aab \
+               release_assets/${REPO}-${VERSION}.aab || true
+            tar czf release_assets/${REPO}-${VERSION}-linux.tar.gz \
+               -C build/linux/x64/release bundle || true
+          else
+            flutter build macos --release
+            APP=$(find build/macos/Build/Products/Release -type d -name "*.app" | head -n 1)
+            hdiutil create -volname FlutterApp \
+              -srcfolder "$APP" \
+              -ov -format UDZO \
+              release_assets/${REPO}-${VERSION}.dmg
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-release-assets
+          path: release_assets/
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+  release:
+    name: Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+          merge-multiple: true
+
+      - name: Debug release_assets
+        run: ls -Rlh release_assets
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: |
+          npm install --no-save semantic-release \
+            @semantic-release/commit-analyzer \
+            @semantic-release/release-notes-generator \
+            @semantic-release/changelog \
+            @semantic-release/git \
+            @semantic-release/github
+
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release

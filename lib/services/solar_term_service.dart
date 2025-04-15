@@ -25,13 +25,12 @@ class SolarTermService {
 
     if (yearData == null) return [];
 
-    final List<SolarTerm> terms =
-        (yearData['jieqi'] as List).map((item) {
-          return SolarTerm(
-            name: item['name'],
-            datetime: DateTime.parse(item['datetime']),
-          );
-        }).toList();
+    final List<SolarTerm> terms = (yearData['jieqi'] as List).map((item) {
+      return SolarTerm(
+        name: item['name'],
+        datetime: DateTime.parse(item['datetime']),
+      );
+    }).toList();
 
     _cache[year] = terms;
     return terms;

@@ -52,7 +52,7 @@ class _BirthInputPageState extends State<BirthInputPage> {
       );
 
       final chart = await calculateBaZi(birthData);
-      
+
       if (!mounted) return;
 
       Navigator.of(context).push(
