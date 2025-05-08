@@ -22,11 +22,11 @@ class BaZiResultCard extends StatelessWidget {
   Widget _buildCell(String text,
       {Color? color, FontWeight? weight, double fontSize = 16}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       child: Text(
         text,
         style: TextStyle(
-          color: color,
+          color: color ?? Colors.black87,
           fontWeight: weight ?? FontWeight.normal,
           fontSize: fontSize,
         ),
@@ -37,6 +37,15 @@ class BaZiResultCard extends StatelessWidget {
 
   TableRow _buildRow(List<Widget> children) {
     return TableRow(children: children);
+  }
+
+  String getShiChen(DateTime dt) {
+    final hour = dt.hour;
+    final minute = dt.minute;
+    final totalMinutes = hour * 60 + minute;
+    const zhis = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+    final index = ((totalMinutes + 60) ~/ 120) % 12;
+    return zhis[index];
   }
 
   @override
@@ -63,35 +72,42 @@ class BaZiResultCard extends StatelessWidget {
 
       final gan = pillar.gan;
       final zhi = pillar.zhi;
-      final ganColor = colorForWuXing(ganToWuXing[gan]!);
-      final zhiColor = colorForWuXing(zhiToWuXing[zhi]!);
-      final ganWuXing = getWuXingName(ganToWuXing[gan]!);
-      final zhiWuXing = getWuXingName(zhiToWuXing[zhi]!);
+      final ganXing = ganToWuXing[gan]!;
+      final zhiXing = zhiToWuXing[zhi]!;
+      final ganColor = colorForWuXing(ganXing);
+      final zhiColor = colorForWuXing(zhiXing);
 
+      final ganWuXing = getWuXingName(ganXing);
+      final zhiWuXing = getWuXingName(zhiXing);
       final ss = i == 2 ? '日主' : getShiShen(riGan, gan);
 
-      ganRow.add(_buildCell(gan, color: ganColor));
+      ganRow.add(_buildCell(gan, color: ganColor, weight: FontWeight.bold));
       zhiRow.add(_buildCell(zhi, color: zhiColor));
-      wuXingRow.add(_buildCell('($ganWuXing/$zhiWuXing)',
-          color: Colors.grey[600], fontSize: 13));
-      shiShenRow.add(_buildCell(ss, color: Colors.grey[700]));
+      wuXingRow.add(
+        _buildCell('$ganWuXing / $zhiWuXing',
+            color: Colors.brown[600], fontSize: 13),
+      );
+      shiShenRow.add(
+        _buildCell(ss, color: Colors.blueGrey[700], fontSize: 14),
+      );
     }
 
     final dateStr = DateFormat('yyyy-MM-dd HH:mm').format(birthDate);
     final lunar = Lunar.fromDate(birthDate);
     final lunarStr =
-        '${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}日 ${lunar.getTimeZhi()}时';
+        '${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}日 ${getShiChen(birthDate)}时';
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          padding: const EdgeInsets.symmetric(vertical: 12.0),
           child: Column(
             children: [
               Text(
                 '${name != null && name!.isNotEmpty ? '$name ・ ' : ''}$gender ・ 出生时间：$dateStr',
                 style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               Text(
@@ -102,12 +118,21 @@ class BaZiResultCard extends StatelessWidget {
           ),
         ),
         Card(
-          elevation: 4,
-          margin: const EdgeInsets.all(8),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          color: Colors.white,
+          elevation: 5,
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             child: Table(
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+              columnWidths: const {
+                0: FlexColumnWidth(),
+                1: FlexColumnWidth(),
+                2: FlexColumnWidth(),
+                3: FlexColumnWidth(),
+              },
               children: [
                 _buildRow(labels
                     .map((e) => _buildCell(e, weight: FontWeight.bold))

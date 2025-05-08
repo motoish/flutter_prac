@@ -15,7 +15,7 @@ class SolarTermService {
     if (_cache.containsKey(year)) return _cache[year]!;
 
     final jsonStr = await rootBundle.loadString(
-      'assets/solar_terms_2020_2025.json',
+      'assets/solar_terms_1900_2100.json',
     );
     final jsonData = json.decode(jsonStr) as List;
     final yearData = jsonData.firstWhere(

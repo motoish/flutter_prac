@@ -64,12 +64,11 @@ Future<BaZiChart> calculateBaZi(BirthData data) async {
   final dayZhi = diZhi[(dayNum + 12) % 12];
 
   GanZhi? hourPillar;
-  if (data.hour != null) {
-    final index = ((data.hour! + 1) ~/ 2) % 12;
-    final hourZhi = diZhi[index];
-    final hourGan = tianGan[(dayNum * 2 + index) % 10];
-    hourPillar = GanZhi(hourGan, hourZhi);
-  }
+  final hour = data.date.hour;
+  final index = ((hour + 1) ~/ 2) % 12;
+  final hourZhi = diZhi[index];
+  final hourGan = tianGan[(dayNum * 2 + index) % 10];
+  hourPillar = GanZhi(hourGan, hourZhi);
 
   return BaZiChart(
     year: GanZhi(yearGan, yearZhi),

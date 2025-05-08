@@ -43,12 +43,18 @@ class _BirthInputPageState extends State<BirthInputPage> {
 
   void _submit() async {
     if (_formKey.currentState?.validate() == true && _selectedDate != null) {
+      final fullDateTime = DateTime(
+        _selectedDate!.year,
+        _selectedDate!.month,
+        _selectedDate!.day,
+        _selectedTime?.hour ?? 0,
+        _selectedTime?.minute ?? 0,
+      );
+
       final birthData = BirthData(
         name: _nameController.text.isEmpty ? null : _nameController.text,
         gender: _selectedGender,
-        date: _selectedDate!,
-        hour: _selectedTime?.hour,
-        minute: _selectedTime?.minute,
+        date: fullDateTime,
       );
 
       final chart = await calculateBaZi(birthData);
